@@ -38,7 +38,7 @@ case "${1:-status}" in
     echo "app:     $(pm2 jlist 2>/dev/null | grep -o '"status":"[a-z]*"' | head -1 | cut -d'"' -f4 || echo unknown)"
     echo "nginx:   $(systemctl is-active nginx)"
     echo "db:      $(systemctl is-active postgresql)"
-    echo "public:  HTTP $(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/login)"
+    echo "site:    HTTP $(curl -sk -o /dev/null -w '%{http_code}' --resolve dynamicblack.network:443:127.0.0.1 https://dynamicblack.network/login)  (200 live, 503 suspended)"
     ;;
   logs)
     tail -n "${2:-50}" -f /var/log/legacy-flow/out.log
