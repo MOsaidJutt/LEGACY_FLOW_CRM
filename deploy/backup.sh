@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
-# Nightly logical backup of the Neon database to the backup server (30-day retention).
+# Nightly logical backup of the Legacy Flow database (30-day retention).
 # crontab on the VPS:   15 3 * * *  /opt/legacy-flow/deploy/backup.sh >> /var/log/legacy-flow/backup.log 2>&1
-# Needs: postgresql-client (pg_dump 17), ssh key access to the backup server.
+# Needs: postgresql-client. Set BACKUP_HOST in the environment to also copy each dump off the server.
 set -euo pipefail
 
-source /opt/legacy-flow/.env.production          # provides DATABASE_URL (use the direct, non-pooler host)
-BACKUP_HOST="${BACKUP_HOST:-backup@backup.example.com}"
-BACKUP_DIR="${BACKUP_DIR:-/srv/backups/legacy-flow}"
+set -a
+source /opt/legacy-flow/.env.production          # provides DATABASE_URL
+set +a
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/legacy-flow}"
 STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
-FILE="/tmp/legacy-flow-${STAMP}.dump"
+FILE="${BACKUP_DIR}/legacy-flow-${STAMP}.dump"
 
+mkdir -p "${BACKUP_DIR}"
 pg_dump --format=custom --no-owner --no-privileges "${DATABASE_URL}" --file "${FILE}"
-scp -q "${FILE}" "${BACKUP_HOST}:${BACKUP_DIR}/"
-rm -f "${FILE}"
-ssh "${BACKUP_HOST}" "find '${BACKUP_DIR}' -name 'legacy-flow-*.dump' -mtime +30 -delete"
-echo "${STAMP} backup ok"
+
+# Optional off-server copy (the backup server that comes with the Monthly Service Plan).
+if [ -n "${BACKUP_HOST:-}" ]; then
+    scp -q "${FILE}" "${BACKUP_HOST}:${REMOTE_BACKUP_DIR:-/srv/backups/legacy-flow}/"
+    ssh "${BACKUP_HOST}" "find '${REMOTE_BACKUP_DIR:-/srv/backups/legacy-flow}' -name 'legacy-flow-*.dump' -mtime +30 -delete"
+fi
+
+find "${BACKUP_DIR}" -name 'legacy-flow-*.dump' -mtime +30 -delete
+echo "${STAMP} backup ok ($(du -h "${FILE}" | cut -f1))"
 
 # Restore (into an empty database):
 #   pg_restore --no-owner --no-privileges --dbname "<target url>" legacy-flow-<stamp>.dump
