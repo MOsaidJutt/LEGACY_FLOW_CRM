@@ -56,7 +56,7 @@ case "${1:-status}" in
   ssl)
     DOMAIN="${2:-dynamicblack.network}"
     ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}')
-    dns=$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')
+    dns=$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk 'NR==1{print $1}' || true)
     echo "this server: $ip"
     echo "$DOMAIN -> ${dns:-unresolved}"
     if [ "$ip" != "$dns" ]; then
