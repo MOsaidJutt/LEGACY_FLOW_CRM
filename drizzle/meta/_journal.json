@@ -8,6 +8,13 @@
       "when": 1789057873434,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790800992750,
+      "tag": "0001_shiny_krista_starr",
+      "breakpoints": true
     }
   ]
 }

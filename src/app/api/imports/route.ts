@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     const file = form.get("file");
     if (!(file instanceof File) || file.size === 0) throw new ActionError("Choose a file to upload.");
     if (file.size > MAX_FILE_BYTES) throw new ActionError("The file is larger than 15 MB. Split it into smaller files.");
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) throw new ActionError("Upload an Excel file (.xlsx or .xls) or a CSV file.");
     const sourceId = String(form.get("sourceId") ?? "");
     const id = await createImport({
       fileName: file.name,

@@ -10,7 +10,8 @@ import { readSettings, saveSetting, type BreakType, type DialerSettings } from "
 const TONES = ["neutral", "success", "warning", "danger", "info"] as const;
 const ACTIONS = ["release", "retain", "close", "dnc"] as const;
 const FIELD_TYPES = ["text", "phone", "email", "url", "number", "date"] as const;
-export const TIMEZONES = ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "Asia/Karachi", "UTC"];
+// NOTE: a "use server" file may only export async functions, so this stays module-private.
+const TIMEZONES = ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "Asia/Karachi", "UTC"];
 
 const int = (v: string, min: number, max: number) => {
   const n = Number(v);
@@ -231,3 +232,57 @@ export async function saveDialerAction(_prev: ActionState, formData: FormData): 
   }
 }
 
+
+/* ------------------------------------------------------------------ email */
+
+export async function saveEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const actor = await authorize("settings.manage");
+    const current = (await readSettings()).email;
+    const host = formString(formData, "host").slice(0, 200);
+    const port = int(formString(formData, "port"), 1, 65535);
+    const fromEmail = formString(formData, "fromEmail").slice(0, 200);
+    const replyTo = formString(formData, "replyTo").slice(0, 200);
+    const mail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    if (host && !port) return { error: "Enter the mail server port, usually 587 or 465." };
+    if (host && !mail.test(fromEmail)) return { error: "Enter the address the emails are sent from." };
+    if (replyTo && !mail.test(replyTo)) return { error: "The reply-to address is not a valid email address." };
+    const newPassword = formString(formData, "password");
+    const next = {
+      host,
+      port: port ?? 587,
+      secure: formData.get("secure") === "on",
+      user: formString(formData, "user").slice(0, 200),
+      password: newPassword || current.password,
+      fromName: formString(formData, "fromName").slice(0, 120),
+      fromEmail,
+      replyTo,
+    };
+    await saveSetting("email", next, actor.id);
+    await audit({
+      actorId: actor.id,
+      action: "email_settings_changed",
+      module: "settings",
+      entityType: "settings",
+      entityId: "email",
+      before: { host: current.host, port: current.port, secure: current.secure, user: current.user, fromEmail: current.fromEmail },
+      after: { host: next.host, port: next.port, secure: next.secure, user: next.user, fromEmail: next.fromEmail, passwordChanged: Boolean(newPassword) },
+    });
+    revalidatePath("/admin/email");
+    return { ok: true, message: host ? "Email settings saved." : "Email settings saved. Sending stays switched off until a mail server is entered." };
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+/** Opens a connection to the saved mail server so problems surface before a lead is emailed. */
+export async function testEmailAction(): Promise<ActionState> {
+  try {
+    await authorize("settings.manage");
+    const { verifyMailSettings } = await import("@/lib/email");
+    const result = await verifyMailSettings();
+    return result.ok ? { ok: true, message: "The mail server accepted the connection and sign-in." } : { error: result.error };
+  } catch (error) {
+    return failure(error);
+  }
+}

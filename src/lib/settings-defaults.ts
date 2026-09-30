@@ -12,6 +12,18 @@ export type DialerSettings = {
 
 export type BreakType = { key: string; label: string; maxMinutes: number };
 
+export type EmailSettings = {
+  /** Outgoing SMTP server used for follow-up emails. Empty host = sending is switched off. */
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  password: string;
+  fromName: string;
+  fromEmail: string;
+  replyTo: string;
+};
+
 export type AppSettings = {
   companyName: string;
   businessTimezone: string;
@@ -24,6 +36,9 @@ export type AppSettings = {
   breakTypes: BreakType[];
   hrDocumentCategories: string[];
   dialer: DialerSettings;
+  email: EmailSettings;
+  /** Rupees deducted per absent day = basic / this many working days. 0 = use the month's scheduled days. */
+  payrollWorkingDays: number;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -47,4 +62,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     vcdialer: { apiBaseUrl: "", apiKey: "", accountId: "" },
     extensions: {},
   },
+  email: { host: "", port: 587, secure: false, user: "", password: "", fromName: "Lone Star Legacy", fromEmail: "", replyTo: "" },
+  payrollWorkingDays: 26,
 };

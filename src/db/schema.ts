@@ -710,3 +710,71 @@ export const reports = pgTable(
   },
   (t) => [index("reports_created_idx").on(t.createdAt)],
 );
+
+/* ------------------------------------------------------------------ follow-up emails */
+
+/** Follow-up emails sent to a lead from the Management leads panel. */
+export const leadEmails = pgTable(
+  "lead_emails",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    /** Management user who sent it. */
+    sentBy: uuid("sent_by").references(() => users.id, { onDelete: "set null" }),
+    /** Agent the lead was assigned to at the moment of sending; kept even after reassignment. */
+    assignedAgentId: uuid("assigned_agent_id").references(() => users.id, { onDelete: "set null" }),
+    /** Lead source / campaign at the moment of sending. */
+    sourceId: uuid("source_id").references(() => leadSources.id, { onDelete: "set null" }),
+    toEmail: varchar("to_email", { length: 255 }).notNull(),
+    subject: varchar("subject", { length: 255 }).notNull(),
+    body: text("body").notNull(),
+    /** sent | failed */
+    status: varchar("status", { length: 20 }).notNull().default("sent"),
+    error: text("error"),
+    messageId: varchar("message_id", { length: 250 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("lead_emails_lead_idx").on(t.leadId, t.createdAt), index("lead_emails_agent_idx").on(t.assignedAgentId)],
+);
+
+/* ------------------------------------------------------------------ salary */
+
+/** The monthly basic salary held for each employee. */
+export const salaryProfiles = pgTable("salary_profiles", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  basicSalary: integer("basic_salary").notNull().default(0),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: updatedAt(),
+});
+
+/** One finalized salary calculation per employee per payroll month. */
+export const salaryRecords = pgTable(
+  "salary_records",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Payroll month, YYYY-MM. */
+    period: varchar("period", { length: 7 }).notNull(),
+    basicSalary: integer("basic_salary").notNull(),
+    workingDays: integer("working_days").notNull(),
+    presentDays: integer("present_days").notNull(),
+    absentDays: integer("absent_days").notNull(),
+    leaveDays: integer("leave_days").notNull().default(0),
+    absenceDeduction: integer("absence_deduction").notNull(),
+    bonus: integer("bonus").notNull().default(0),
+    otherDeduction: integer("other_deduction").notNull().default(0),
+    finalSalary: integer("final_salary").notNull(),
+    note: text("note"),
+    finalizedBy: uuid("finalized_by").references(() => users.id, { onDelete: "set null" }),
+    finalizedAt: ts("finalized_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("salary_records_user_period_uq").on(t.userId, t.period), index("salary_records_period_idx").on(t.period)],
+);

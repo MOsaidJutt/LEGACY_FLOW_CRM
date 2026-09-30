@@ -190,3 +190,9 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* indeterminate progress for long file processing */
+@keyframes lf-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}

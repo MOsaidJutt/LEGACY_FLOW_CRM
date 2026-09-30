@@ -1,30 +1,4 @@
-import {
-  Award,
-  Bell,
-  Monitor,
-  CalendarClock,
-  CalendarDays,
-  ChartColumn,
-  ClipboardList,
-  Database,
-  FileSpreadsheet,
-  Gauge,
-  Inbox,
-  LayoutDashboard,
-  ListChecks,
-  Megaphone,
-  MessagesSquare,
-  PhoneCall,
-  ScrollText,
-  ShieldCheck,
-  SlidersHorizontal,
-  Smartphone,
-  Tags,
-  TimerReset,
-  UserRound,
-  Users,
-  UsersRound,
-} from "lucide-react";
+import { Award, Bell, CalendarClock, CalendarDays, ChartColumn, ClipboardList, Database, FileSpreadsheet, Gauge, Inbox, LayoutDashboard, ListChecks, Mail, Megaphone, MessagesSquare, Monitor, PhoneCall, ScrollText, ShieldCheck, SlidersHorizontal, Smartphone, Tags, TimerReset, UserRound, Users, UsersRound, Wallet } from "lucide-react";
 import type { Permission } from "@/lib/auth/permissions";
 
 export type NavItem = {
@@ -66,6 +40,7 @@ export const NAV: NavGroup[] = [
       { href: "/hr", label: "Employees", icon: UserRound, anyOf: ["hr.manage"], exact: true },
       { href: "/hr/leave", label: "Leave", icon: CalendarDays, anyOf: ["hr.manage"] },
       { href: "/hr/attendance", label: "Attendance", icon: ClipboardList, anyOf: ["hr.attendance"] },
+      { href: "/manage/salary", label: "Salary", icon: Wallet, anyOf: ["salary.manage"] },
     ],
   },
   {
@@ -78,6 +53,7 @@ export const NAV: NavGroup[] = [
       { href: "/admin/dispositions", label: "Dispositions", icon: ListChecks, anyOf: ["settings.manage"] },
       { href: "/admin/fields", label: "Lead fields", icon: Tags, anyOf: ["settings.manage"] },
       { href: "/admin/dialer", label: "Dialer", icon: Smartphone, anyOf: ["settings.manage"] },
+      { href: "/admin/email", label: "Email", icon: Mail, anyOf: ["settings.manage"] },
       { href: "/admin/settings", label: "Time & rules", icon: TimerReset, anyOf: ["settings.manage"] },
       { href: "/admin/audit", label: "Audit log", icon: ScrollText, anyOf: ["audit.view"] },
     ],

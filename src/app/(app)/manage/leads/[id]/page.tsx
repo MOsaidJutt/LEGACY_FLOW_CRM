@@ -7,6 +7,8 @@ import { requirePermission } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
 import { agentUsers } from "@/lib/metrics";
 import { leadTimeline } from "@/lib/leads/calls";
+import { leadEmailHistory } from "@/lib/leads/emails";
+import { emailReady } from "@/lib/email";
 import { formatPhone } from "@/lib/phone";
 import { formatDateTime, formatDuration } from "@/lib/time";
 import { LEAD_STATUS } from "@/lib/leads/status";
@@ -14,6 +16,7 @@ import { PageHeader, Panel } from "@/components/ui/layout";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { Badge, toneOf } from "@/components/ui/badge";
 import { LeadActions } from "./lead-actions";
+import { FollowUpEmail } from "./follow-up-email";
 
 export const metadata: Metadata = { title: "Lead" };
 
@@ -44,7 +47,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const tz = (await getSettings()).businessTimezone;
   const canListen = user.permissions.includes("calls.recordings");
 
-  const [history, callRows, timeline, agents, dnc, fields] = await Promise.all([
+  const [history, callRows, timeline, agents, dnc, fields, emails, mailReady] = await Promise.all([
     db
       .select({ id: leadAssignments.id, action: leadAssignments.action, createdAt: leadAssignments.createdAt, agent: users.name, actor: actor.name, note: leadAssignments.note })
       .from(leadAssignments)
@@ -65,7 +68,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     agentUsers(),
     lead.phoneE164 ? db.select().from(dncNumbers).where(eq(dncNumbers.phoneE164, lead.phoneE164)) : Promise.resolve([]),
     db.select({ key: leadFields.key, label: leadFields.label }).from(leadFields),
+    leadEmailHistory(id),
+    emailReady(),
   ]);
+  const lastSent = emails.find((e) => e.status === "sent");
   const labels = new Map(fields.map((f) => [f.key, f.label]));
   const details: [string, React.ReactNode][] = [
     ["Contact", [lead.contactName, lead.title].filter(Boolean).join(", ")],
@@ -89,6 +95,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <span className="inline-flex flex-wrap items-center gap-2">
             <Badge tone={LEAD_STATUS[lead.status].tone}>{LEAD_STATUS[lead.status].label}</Badge>
             {row.assignee ? <span>with {row.assignee}</span> : null}
+            {lastSent ? <Badge tone="info">Follow-up email sent</Badge> : null}
           </span>
         }
       />
@@ -145,6 +152,46 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             )}
           </Panel>
 
+          <Panel title="Follow-up emails" flush>
+            {emails.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-ink-3">No follow-up email has been sent to this lead.</p>
+            ) : (
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>When</Th>
+                    <Th>Subject</Th>
+                    <Th>To</Th>
+                    <Th>Sent by</Th>
+                    <Th>Agent at the time</Th>
+                    <Th>Status</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {emails.map((e) => (
+                    <Tr key={e.id}>
+                      <Td className="whitespace-nowrap tabular-nums">{formatDateTime(e.createdAt, tz)}</Td>
+                      <Td className="max-w-[20rem]">{e.subject}</Td>
+                      <Td className="[overflow-wrap:anywhere]">{e.toEmail}</Td>
+                      <Td className="whitespace-nowrap">{e.sentBy ?? "-"}</Td>
+                      <Td className="whitespace-nowrap">{e.assignedAgent ?? <span className="text-ink-3">Unassigned</span>}</Td>
+                      <Td>
+                        {e.status === "sent" ? (
+                          <Badge tone="success">Sent</Badge>
+                        ) : (
+                          <span className="inline-flex flex-col gap-0.5">
+                            <Badge tone="danger">Failed</Badge>
+                            {e.error ? <span className="text-xs text-ink-3">{e.error}</span> : null}
+                          </span>
+                        )}
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </Panel>
+
           <Panel title="Timeline" flush>
             <ol className="divide-y divide-line">
               {timeline.map((t) => (
@@ -174,6 +221,16 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               onDncList={dnc.length > 0}
             />
           </Panel>
+          <Panel title="Follow-up email">
+            <FollowUpEmail
+              leadId={lead.id}
+              leadName={lead.company || lead.contactName || "there"}
+              email={lead.email}
+              assignedAgent={row.assignee}
+              configured={mailReady}
+            />
+          </Panel>
+
           <Panel title="Assignment history" flush>
             {history.length === 0 ? (
               <p className="px-4 py-6 text-sm text-ink-3">Never assigned.</p>

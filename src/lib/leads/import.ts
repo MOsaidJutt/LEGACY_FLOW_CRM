@@ -33,44 +33,81 @@ function cellText(cell: ExcelJS.Cell): string {
   return String(cell.text ?? "").trim();
 }
 
-export async function parseSpreadsheet(data: Buffer, fileName: string) {
-  const wb = new ExcelJS.Workbook();
-  const name = fileName.toLowerCase();
-  try {
-    if (name.endsWith(".csv")) {
-      await wb.csv.read(Readable.from(data), { map: (value: unknown) => value, parserOptions: { ignoreEmpty: true } } as never);
-    } else if (name.endsWith(".xlsx")) {
-      await wb.xlsx.load(data as never);
-    } else {
-      throw new ActionError("Upload an Excel (.xlsx) or CSV file. For older .xls files, open them in Excel and save as .xlsx.");
-    }
-  } catch (error) {
-    if (error instanceof ActionError) throw error;
-    throw new ActionError("The file could not be read. Check that it is a valid .xlsx or .csv file.");
-  }
+/** Rows of plain strings, whatever the file format was. */
+type Grid = string[][];
 
+async function gridFromExcelJs(data: Buffer, isCsv: boolean): Promise<Grid> {
+  const wb = new ExcelJS.Workbook();
+  if (isCsv) {
+    await wb.csv.read(Readable.from(data), { map: (value: unknown) => value, parserOptions: { ignoreEmpty: true } } as never);
+  } else {
+    await wb.xlsx.load(data as never);
+  }
   const sheet = wb.worksheets.find((ws) => ws.actualRowCount > 0);
   if (!sheet) throw new ActionError("The file has no data.");
   const width = sheet.columnCount;
+  const grid: Grid = [];
+  for (let r = 1; r <= sheet.rowCount; r++) {
+    const row = sheet.getRow(r);
+    const cells: string[] = [];
+    for (let c = 1; c <= width; c++) cells.push(cellText(row.getCell(c)));
+    grid.push(cells);
+  }
+  return grid;
+}
+
+/** Legacy .xls workbooks (BIFF), which ExcelJS cannot read. */
+async function gridFromXls(data: Buffer): Promise<Grid> {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.read(data, { type: "buffer", cellDates: true, raw: false });
+  const sheetName = wb.SheetNames.find((n) => {
+    const ref = wb.Sheets[n]?.["!ref"];
+    return typeof ref === "string" && ref.length > 0;
+  });
+  if (!sheetName) throw new ActionError("The file has no data.");
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, blankrows: false, defval: "", raw: false });
+  return rows.map((row) =>
+    (row ?? []).map((v) => {
+      if (v === null || v === undefined) return "";
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return String(v).trim();
+    }),
+  );
+}
+
+export async function parseSpreadsheet(data: Buffer, fileName: string) {
+  const name = fileName.toLowerCase();
+  let grid: Grid;
+  try {
+    if (name.endsWith(".csv")) grid = await gridFromExcelJs(data, true);
+    else if (name.endsWith(".xlsx")) grid = await gridFromExcelJs(data, false);
+    else if (name.endsWith(".xls")) grid = await gridFromXls(data);
+    else throw new ActionError("Upload an Excel file (.xlsx or .xls) or a CSV file.");
+  } catch (error) {
+    if (error instanceof ActionError) throw error;
+    throw new ActionError("The file could not be read. Check that it is a valid .xlsx, .xls or .csv file.");
+  }
+
+  const width = grid.reduce((w, row) => Math.max(w, row.length), 0);
+  if (!width) throw new ActionError("The file has no data.");
+  const at = (r: number, c: number) => (grid[r]?.[c] ?? "").toString();
 
   // header = first of the first 10 rows with at least two filled cells
-  let headerRow = 0;
-  for (let r = 1; r <= Math.min(10, sheet.rowCount); r++) {
-    const row = sheet.getRow(r);
+  let headerRow = -1;
+  for (let r = 0; r < Math.min(10, grid.length); r++) {
     let filled = 0;
-    for (let c = 1; c <= width; c++) if (cellText(row.getCell(c))) filled++;
+    for (let c = 0; c < width; c++) if (at(r, c)) filled++;
     if (filled >= 2) {
       headerRow = r;
       break;
     }
   }
-  if (!headerRow) throw new ActionError("No header row was found. The first row should contain column names.");
+  if (headerRow < 0) throw new ActionError("No header row was found. The first row should contain column names.");
 
   const seen = new Map<string, number>();
   const headers: string[] = [];
-  const header = sheet.getRow(headerRow);
-  for (let c = 1; c <= width; c++) {
-    let h = cellText(header.getCell(c)).replace(/\s+/g, " ").slice(0, 80) || `Column ${c}`;
+  for (let c = 0; c < width; c++) {
+    let h = at(headerRow, c).replace(/\s+/g, " ").slice(0, 80) || `Column ${c + 1}`;
     const n = (seen.get(h.toLowerCase()) ?? 0) + 1;
     seen.set(h.toLowerCase(), n);
     if (n > 1) h = `${h} (${n})`;
@@ -78,17 +115,16 @@ export async function parseSpreadsheet(data: Buffer, fileName: string) {
   }
 
   const rows: { rowNumber: number; raw: Record<string, string> }[] = [];
-  for (let r = headerRow + 1; r <= sheet.rowCount; r++) {
-    const row = sheet.getRow(r);
+  for (let r = headerRow + 1; r < grid.length; r++) {
     const raw: Record<string, string> = {};
     let any = false;
     headers.forEach((h, i) => {
-      const v = cellText(row.getCell(i + 1)).slice(0, 1000);
+      const v = at(r, i).slice(0, 1000);
       if (v) any = true;
       raw[h] = v;
     });
     if (!any) continue;
-    rows.push({ rowNumber: r, raw });
+    rows.push({ rowNumber: r + 1, raw });
     if (rows.length > MAX_ROWS) throw new ActionError(`The file has more than ${MAX_ROWS.toLocaleString()} rows. Split it into smaller files.`);
   }
   if (!rows.length) throw new ActionError("The file has a header row but no data rows.");

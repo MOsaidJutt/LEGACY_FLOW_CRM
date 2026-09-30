@@ -12,13 +12,16 @@ import { PageHeader } from "@/components/ui/layout";
 import { Input, Select } from "@/components/ui/input";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { LEAD_STATUS } from "@/lib/leads/status";
+import { lastEmailByLead } from "@/lib/leads/emails";
+import { leadDatabases } from "@/lib/leads/delete";
+import { DeleteLeadDatabase } from "./delete-database";
 import { LeadsTable } from "./leads-table";
 
 export const metadata: Metadata = { title: "Leads" };
 const PAGE = 50;
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requirePermission("leads.manage");
+  const user = await requirePermission("leads.manage");
   const sp = await searchParams;
   const get = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string).trim() : "");
   const f = { q: get("q").slice(0, 100), status: get("status"), agent: get("agent"), source: get("source"), import: get("import"), from: get("from"), to: get("to") };
@@ -85,6 +88,9 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     db.select({ id: leadSources.id, name: leadSources.name }).from(leadSources).orderBy(asc(leadSources.name)),
   ]);
 
+  const emailed = await lastEmailByLead(rows.map((r) => r.id));
+  const canImport = user.permissions.includes("leads.import");
+  const databases = canImport ? await leadDatabases() : [];
   const pages = Math.max(1, Math.ceil(total / PAGE));
   const qs = (params: Record<string, string | number>) =>
     `/manage/leads?${new URLSearchParams(Object.entries({ ...f, page: String(page), ...params }).filter(([, v]) => v !== "" && v !== undefined).map(([k, v]) => [k, String(v)]))}`;
@@ -95,7 +101,12 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       <PageHeader
         title="Leads"
         description={`${total.toLocaleString()} ${filtered ? "matching" : ""} leads. Select leads to assign, transfer or release them.`}
-        actions={<ButtonLink href="/manage/imports/new">Import leads</ButtonLink>}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {canImport ? <DeleteLeadDatabase databases={databases} /> : null}
+            <ButtonLink href="/manage/imports/new">Import leads</ButtonLink>
+          </div>
+        }
       />
 
       <form action="/manage/leads" className="mb-4 flex flex-wrap items-end gap-2">
@@ -164,6 +175,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           outcome: r.outcome,
           outcomeTone: r.outcomeTone,
           lastCalled: r.lastCalledAt ? formatDateTime(r.lastCalledAt, tz) : null,
+          emailSent: emailed.has(r.id) ? formatDateTime(emailed.get(r.id)!, tz) : null,
         }))}
       />
 

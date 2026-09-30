@@ -10,6 +10,7 @@ import { PageHeader, EmptyState } from "@/components/ui/layout";
 import { ButtonLink } from "@/components/ui/button";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { Badge, type Tone } from "@/components/ui/badge";
+import { DeleteImport } from "./delete-import";
 
 export const metadata: Metadata = { title: "Imports" };
 
@@ -71,6 +72,7 @@ export default async function ImportsPage() {
                 <Th className="text-right">Bad phone</Th>
                 <Th className="text-right">Imported</Th>
                 <Th>Status</Th>
+                <Th className="text-right">Delete</Th>
               </tr>
             </thead>
             <tbody>
@@ -92,6 +94,9 @@ export default async function ImportsPage() {
                   <Td className="text-right tabular-nums">{r.stats.importedRows ?? ""}</Td>
                   <Td>
                     <Badge tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Badge>
+                  </Td>
+                  <Td className="text-right">
+                    <DeleteImport importId={r.id} fileName={r.fileName} />
                   </Td>
                 </Tr>
               ))}

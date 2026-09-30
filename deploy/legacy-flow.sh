@@ -49,6 +49,7 @@ case "${1:-status}" in
     npm install --no-audit --no-fund
     set -a; . "$APP_DIR/.env.production"; set +a
     npm run db:migrate
+    npm run db:seed          # keeps system role permissions in step with the code
     NODE_ENV=production npm run build
     pm2 restart legacy-flow --update-env
     echo "updated."

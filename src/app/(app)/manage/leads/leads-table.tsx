@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Database } from "lucide-react";
+import { Database, Mail } from "lucide-react";
 import { Badge, toneOf } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Select } from "@/components/ui/input";
@@ -27,6 +27,7 @@ type Row = {
   outcome: string | null;
   outcomeTone: string | null;
   lastCalled: string | null;
+  emailSent: string | null;
 };
 
 export function LeadsTable({ rows, agents }: { rows: Row[]; agents: { id: string; name: string }[] }) {
@@ -124,6 +125,9 @@ export function LeadsTable({ rows, agents }: { rows: Row[]; agents: { id: string
                 <Td className="max-w-[16rem] truncate">
                   <Link href={`/manage/leads/${r.id}`} className="font-medium hover:underline">
                     {r.company || r.contactName || "Unnamed lead"}
+                    {r.emailSent ? (
+                      <Mail className="ml-1.5 inline size-3.5 align-[-2px] text-info" aria-label={`Follow-up email sent ${r.emailSent}`} />
+                    ) : null}
                   </Link>
                 </Td>
                 <Td className="max-w-[12rem] truncate text-ink-2">{r.contactName}</Td>

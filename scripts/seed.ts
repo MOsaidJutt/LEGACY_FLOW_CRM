@@ -43,7 +43,11 @@ async function main() {
     await db
       .insert(schema.roles)
       .values({ key, name: role.name, description: role.description, permissions: role.permissions, isSystem: true })
-      .onConflictDoNothing({ target: schema.roles.key });
+      .onConflictDoUpdate({
+        // system roles follow the defaults, so new permissions reach existing installations
+        target: schema.roles.key,
+        set: { permissions: sql`(select coalesce(jsonb_agg(distinct p), '[]'::jsonb) from jsonb_array_elements(${schema.roles.permissions} || ${JSON.stringify(role.permissions)}::jsonb) as p)` },
+      });
   }
   const roleRows = await db.select().from(schema.roles);
   const roleId = (key: string) => roleRows.find((r) => r.key === key)!.id;

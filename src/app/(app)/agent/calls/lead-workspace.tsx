@@ -76,6 +76,8 @@ export function LeadWorkspace({
   const disposition = dispositions.find((d) => d.id === selected);
   const callable = lead.hasValidPhone && !dnc;
   const title = lead.company || lead.contactName || "Unnamed lead";
+  // Management can send a follow-up email from the Leads panel; the agent holding the lead sees it here.
+  const emailSent = timeline.find((t) => t.type === "email_sent");
 
   async function copyNumber(text: string) {
     try {
@@ -157,6 +159,7 @@ export function LeadWorkspace({
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-3">
               {lead.status === "follow_up" ? <Badge tone="info">Follow-up</Badge> : null}
+              {emailSent ? <Badge tone="info">Follow-up email sent</Badge> : null}
               <span>
                 {lead.callCount === 0 ? "Not called yet" : `${lead.callCount} ${lead.callCount === 1 ? "call" : "calls"}, last ${lead.lastCalledAt}`}
               </span>

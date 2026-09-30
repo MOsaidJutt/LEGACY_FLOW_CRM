@@ -11,6 +11,7 @@ export const PERMISSIONS = [
   { key: "messages.use", group: "Communication", label: "Send and receive messages" },
   { key: "announcements.post", group: "Communication", label: "Post announcements" },
   { key: "hr.manage", group: "HR", label: "Manage employee records, documents and leave" },
+  { key: "salary.manage", group: "HR", label: "Calculate and finalize salaries" },
   { key: "hr.attendance", group: "HR", label: "View attendance and punctuality" },
   { key: "users.manage", group: "Administration", label: "Manage user accounts, roles and groups" },
   { key: "settings.manage", group: "Administration", label: "Manage settings, dispositions, fields and dialer" },
@@ -27,7 +28,7 @@ export const DEFAULT_ROLES: Record<string, { name: string; description: string; 
   },
   management: {
     name: "Management",
-    description: "Imports and distributes leads, monitors the floor, runs reports.",
+    description: "Imports and distributes leads, monitors the floor, runs reports, and administers the CRM.",
     permissions: [
       "leads.import",
       "leads.manage",
@@ -38,14 +39,20 @@ export const DEFAULT_ROLES: Record<string, { name: string; description: string; 
       "reports.approve",
       "messages.use",
       "announcements.post",
+      // Management runs the floor day to day, so it also holds everything Admin can do:
+      // accounts and roles, system configuration, HR records, salaries and the audit log.
       "hr.attendance",
+      "hr.manage",
+      "salary.manage",
+      "users.manage",
+      "settings.manage",
       "audit.view",
     ],
   },
   admin: {
     name: "Admin",
     description: "Manages accounts, permissions and system configuration.",
-    permissions: ["users.manage", "settings.manage", "audit.view", "monitor.view", "reports.view", "messages.use", "announcements.post"],
+    permissions: ["users.manage", "settings.manage", "audit.view", "monitor.view", "reports.view", "messages.use", "announcements.post", "salary.manage"],
   },
   hr: {
     name: "HR",
