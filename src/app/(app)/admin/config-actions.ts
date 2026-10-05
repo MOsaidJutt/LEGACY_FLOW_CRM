@@ -34,15 +34,19 @@ export async function saveDispositionAction(_prev: ActionState, formData: FormDa
     if (id) {
       const [before] = await db.select().from(schema.dispositions).where(eq(schema.dispositions.id, id));
       if (!before) return { error: "Outcome not found." };
-      const next: Partial<typeof before> = { label, description, tone, sortOrder };
-      if (!before.isSystem) {
-        // the required default set keeps its behavior and cannot be switched off
-        const action = formString(formData, "action") as (typeof ACTIONS)[number];
-        if (!ACTIONS.includes(action)) return { error: "Choose what happens to the lead." };
-        next.action = action;
-        next.requiresCallback = formData.get("requiresCallback") === "on";
-        next.active = formData.get("active") === "on";
-      }
+      const action = formString(formData, "action") as (typeof ACTIONS)[number];
+      if (!ACTIONS.includes(action)) return { error: "Choose what happens to the lead." };
+      const next: Partial<typeof before> = {
+        label,
+        description,
+        tone,
+        sortOrder,
+        action,
+        requiresCallback: formData.get("requiresCallback") === "on",
+      };
+      // Management decides what each outcome does, but the six required ones stay
+      // available to agents so the call screen always has a complete set.
+      if (!before.isSystem) next.active = formData.get("active") === "on";
       await db.update(schema.dispositions).set(next).where(eq(schema.dispositions.id, id));
       await audit({ actorId: actor.id, action: "disposition_updated", module: "settings", entityType: "disposition", entityId: id, before: { label: before.label, tone: before.tone, action: before.action, active: before.active }, after: next as Record<string, unknown> });
     } else {

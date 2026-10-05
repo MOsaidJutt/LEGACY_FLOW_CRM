@@ -60,7 +60,7 @@ export function DispositionForm({ disposition: d }: { disposition?: Disposition 
         </Select>
       </Field>
       <Field label="What happens to the lead" htmlFor={`${id}-action`}>
-        <Select id={`${id}-action`} name="action" defaultValue={d?.action ?? "release"} disabled={locked}>
+        <Select id={`${id}-action`} name="action" defaultValue={d?.action ?? "release"}>
           {ACTIONS.map((a) => (
             <option key={a.value} value={a.value}>
               {a.label}
@@ -71,7 +71,7 @@ export function DispositionForm({ disposition: d }: { disposition?: Disposition 
       <SubmitButton>{d ? "Save" : "Add outcome"}</SubmitButton>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 md:col-span-6">
         <label className="flex items-center gap-2 text-sm text-ink-2">
-          <Checkbox name="requiresCallback" defaultChecked={d?.requiresCallback} disabled={locked} />
+          <Checkbox name="requiresCallback" defaultChecked={d?.requiresCallback} />
           Requires a callback date and time
         </label>
         {d ? (
@@ -80,7 +80,12 @@ export function DispositionForm({ disposition: d }: { disposition?: Disposition 
             Available to agents
           </label>
         ) : null}
-        {locked ? <Badge>Required outcome</Badge> : null}
+        {locked ? (
+          <span className="flex items-center gap-2">
+            <Badge>Required outcome</Badge>
+            <span className="text-xs text-ink-3">Always available to agents, but its behavior is yours to set.</span>
+          </span>
+        ) : null}
         <FormMessage state={state} />
       </div>
     </form>

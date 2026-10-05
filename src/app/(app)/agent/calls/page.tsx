@@ -6,6 +6,7 @@ import { db, schema } from "@/db";
 import { requirePermission } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
 import { isOnDncList, leadTimeline } from "@/lib/leads/calls";
+import { emailReady } from "@/lib/email";
 import { formatPhone } from "@/lib/phone";
 import { formatDateTime, tzShortName } from "@/lib/time";
 import { cn } from "@/lib/cn";
@@ -86,7 +87,7 @@ export default async function CallListPage({ searchParams }: { searchParams: Pro
       .from(leads)
       .leftJoin(schema.leadSources, eq(schema.leadSources.id, leads.sourceId))
       .where(eq(leads.id, selectedId));
-    const [dispRows, fieldRows, timeline, dnc, pendingCallback] = await Promise.all([
+    const [dispRows, fieldRows, timeline, dnc, pendingCallback, mailReady] = await Promise.all([
       db.select().from(dispositions).where(eq(dispositions.active, true)).orderBy(asc(dispositions.sortOrder)),
       db.select({ key: schema.leadFields.key, label: schema.leadFields.label }).from(schema.leadFields).where(eq(schema.leadFields.isCore, false)),
       leadTimeline(selectedId),
@@ -96,6 +97,7 @@ export default async function CallListPage({ searchParams }: { searchParams: Pro
         .from(callbacks)
         .where(and(eq(callbacks.leadId, selectedId), eq(callbacks.status, "pending")))
         .limit(1),
+          emailReady(),
     ]);
     const idx = rows.findIndex((r) => r.id === selectedId);
     const nextLeadId = rows[idx + 1]?.id ?? (rows.length > 1 ? rows[0].id : "");
@@ -104,6 +106,7 @@ export default async function CallListPage({ searchParams }: { searchParams: Pro
 
     workspace = (
       <LeadWorkspace
+        mailReady={mailReady}
         key={l.id}
         view={view}
         nextLeadId={nextLeadId}

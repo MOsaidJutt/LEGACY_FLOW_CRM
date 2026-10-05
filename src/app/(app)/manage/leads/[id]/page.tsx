@@ -16,7 +16,7 @@ import { PageHeader, Panel } from "@/components/ui/layout";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { Badge, toneOf } from "@/components/ui/badge";
 import { LeadActions } from "./lead-actions";
-import { FollowUpEmail } from "./follow-up-email";
+import { FollowUpEmail } from "@/components/follow-up-email";
 
 export const metadata: Metadata = { title: "Lead" };
 
@@ -28,9 +28,18 @@ const ASSIGNMENT_LABEL: Record<string, string> = {
   returned_on_timeout: "Returned at session timeout",
 };
 
-export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LeadDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requirePermission("leads.manage");
   const { id } = await params;
+  const from = (await searchParams).from;
+  // only our own query string is accepted back, never an arbitrary destination
+  const listQuery = typeof from === "string" ? from.replace(/[^A-Za-z0-9=&_%.,:+-]/g, "").slice(0, 500) : "";
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const { leads, leadSources, users, leadAssignments, calls, dispositions, dncNumbers, leadFields } = schema;
   const assignee = alias(users, "assignee");
@@ -90,7 +99,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     <>
       <PageHeader
         title={lead.company || lead.contactName || "Unnamed lead"}
-        back={{ href: "/manage/leads", label: "Leads" }}
+        back={{ href: listQuery ? `/manage/leads?${listQuery}` : "/manage/leads", label: listQuery ? "Back to the filtered list" : "Leads" }}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
             <Badge tone={LEAD_STATUS[lead.status].tone}>{LEAD_STATUS[lead.status].label}</Badge>
@@ -228,6 +237,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               email={lead.email}
               assignedAgent={row.assignee}
               configured={mailReady}
+              lastSent={lastSent ? formatDateTime(lastSent.createdAt, tz) : null}
             />
           </Panel>
 

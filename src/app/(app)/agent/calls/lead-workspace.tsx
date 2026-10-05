@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/input";
 import { FormMessage } from "@/components/ui/form-message";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { saveOutcomeAction, startCallAction } from "../actions";
+import { FollowUpEmail } from "@/components/follow-up-email";
 
 type Lead = {
   id: string;
@@ -48,6 +49,7 @@ export function LeadWorkspace({
   dispositions,
   timeline,
   dnc,
+  mailReady,
   pendingCallback,
   view,
   nextLeadId,
@@ -58,6 +60,7 @@ export function LeadWorkspace({
   dispositions: Disposition[];
   timeline: TimelineItem[];
   dnc: boolean;
+  mailReady: boolean;
   pendingCallback: { dueAt: string; note: string | null } | null;
   view: string;
   nextLeadId: string;
@@ -180,6 +183,13 @@ export function LeadWorkspace({
                   {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
                 </Button>
               ) : null}
+              <FollowUpEmail
+                compact
+                leadId={lead.id}
+                leadName={title}
+                email={lead.email}
+                configured={mailReady}
+              />
               <Button variant="primary" onClick={onCall} pending={calling} disabled={!callable} title="Call (C)">
                 {!calling ? <PhoneCall aria-hidden /> : null}
                 {call ? "Call again" : "Call"}

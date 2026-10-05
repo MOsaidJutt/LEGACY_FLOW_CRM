@@ -1,11 +1,11 @@
 import "server-only";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, schema } from "@/db";
 import { ActionError } from "@/lib/actions";
 import { audit } from "@/lib/audit";
 import { sendMail } from "@/lib/email";
-import { notify } from "@/lib/notify";
+import { notify, usersWithPermission } from "@/lib/notify";
 
 const { leads, leadEmails, leadActivities, leadSources, users } = schema;
 
@@ -26,6 +26,10 @@ export async function sendFollowUpEmail(opts: {
   body: string;
   actorId: string;
   actorName: string;
+  /** Address to use when the lead has none, or to correct the one it has. Saved to the lead. */
+  to?: string;
+  /** Set for agents: they may only email a lead that is assigned to them. */
+  restrictToAgentId?: string;
 }): Promise<FollowUpResult> {
   const subject = opts.subject.trim().slice(0, 200);
   const body = opts.body.trim().slice(0, 10_000);
@@ -45,14 +49,23 @@ export async function sendFollowUpEmail(opts: {
     .leftJoin(leadSources, eq(leadSources.id, leads.sourceId))
     .where(eq(leads.id, opts.leadId));
   if (!row) throw new ActionError("Lead not found.");
-  const to = (row.lead.email ?? "").trim();
-  if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw new ActionError("This lead has no valid email address.");
+  if (opts.restrictToAgentId && row.lead.assignedTo !== opts.restrictToAgentId) {
+    throw new ActionError("You can only email a lead that is assigned to you.");
+  }
+  const given = (opts.to ?? "").trim();
+  const to = given || (row.lead.email ?? "").trim();
+  if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
+    throw new ActionError("Enter the email address to send to. This lead does not have one yet.");
+  }
+  // a corrected or newly entered address is kept on the lead, so the next email is one click
+  const saveAddress = given && given.toLowerCase() !== (row.lead.email ?? "").toLowerCase();
 
   const result = await sendMail({ to, subject, text: body });
   const status = result.ok ? "sent" : "failed";
   const leadName = row.lead.company || row.lead.contactName || "the lead";
 
   await db.transaction(async (tx) => {
+    if (saveAddress) await tx.update(leads).set({ email: to }).where(eq(leads.id, opts.leadId));
     await tx.insert(leadEmails).values({
       leadId: opts.leadId,
       sentBy: opts.actorId,
@@ -80,14 +93,26 @@ export async function sendFollowUpEmail(opts: {
         ...(result.ok ? {} : { error: result.error }),
       },
     });
-    // only the agent holding the lead right now is told, and only about a real send
-    if (result.ok && row.agentId) {
-      await notify(tx, [row.agentId], {
-        type: "lead_email",
-        title: "Follow-up email sent",
-        body: `A follow-up email has been sent to ${leadName} by ${opts.actorName}.`,
-        link: `/agent/calls?lead=${opts.leadId}`,
-      });
+    // the other side is told: Management emailing tells the agent holding the lead,
+    // an agent emailing tells Management. Only ever about a real send.
+    if (result.ok) {
+      const sentByTheAgent = row.agentId === opts.actorId;
+      if (sentByTheAgent) {
+        const managers = await usersWithPermission(tx, "leads.manage");
+        await notify(tx, managers.filter((id) => id !== opts.actorId), {
+          type: "lead_email",
+          title: "Follow-up email sent by an agent",
+          body: `${opts.actorName} emailed ${leadName} at ${to}.`,
+          link: `/manage/leads/${opts.leadId}`,
+        });
+      } else if (row.agentId) {
+        await notify(tx, [row.agentId], {
+          type: "lead_email",
+          title: "Follow-up email sent",
+          body: `A follow-up email has been sent to ${leadName} by ${opts.actorName}.`,
+          link: `/agent/calls?lead=${opts.leadId}`,
+        });
+      }
     }
   });
 
@@ -149,4 +174,49 @@ export async function lastEmailByLead(leadIds: string[]) {
   const map = new Map<string, Date>();
   for (const r of rows) if (!map.has(r.leadId)) map.set(r.leadId, r.createdAt);
   return map;
+}
+
+export type EmailLogFilters = { q?: string; status?: string; page?: number };
+
+/** Every follow-up email ever sent, for the Management record panel. */
+export async function emailLog({ q = "", status = "", page = 1 }: EmailLogFilters) {
+  const perPage = 50;
+  const sender = alias(users, "log_sender");
+  const agent = alias(users, "log_agent");
+  const like = `%${q.replace(/[%_]/g, "")}%`;
+  const where = and(
+    status === "sent" || status === "failed" ? eq(leadEmails.status, status) : undefined,
+    q
+      ? or(ilike(leadEmails.toEmail, like), ilike(leadEmails.subject, like), ilike(leads.company, like), ilike(leads.contactName, like))
+      : undefined,
+  );
+
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({
+        id: leadEmails.id,
+        leadId: leadEmails.leadId,
+        company: leads.company,
+        contactName: leads.contactName,
+        toEmail: leadEmails.toEmail,
+        subject: leadEmails.subject,
+        status: leadEmails.status,
+        error: leadEmails.error,
+        createdAt: leadEmails.createdAt,
+        sentBy: sender.name,
+        assignedAgent: agent.name,
+        campaign: leadSources.name,
+      })
+      .from(leadEmails)
+      .innerJoin(leads, eq(leads.id, leadEmails.leadId))
+      .leftJoin(sender, eq(sender.id, leadEmails.sentBy))
+      .leftJoin(agent, eq(agent.id, leadEmails.assignedAgentId))
+      .leftJoin(leadSources, eq(leadSources.id, leadEmails.sourceId))
+      .where(where)
+      .orderBy(desc(leadEmails.createdAt))
+      .limit(perPage)
+      .offset((page - 1) * perPage),
+    db.select({ total: sql<number>`count(*)::int` }).from(leadEmails).innerJoin(leads, eq(leads.id, leadEmails.leadId)).where(where),
+  ]);
+  return { rows, total, perPage };
 }

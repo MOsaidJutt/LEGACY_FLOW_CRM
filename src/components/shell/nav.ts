@@ -30,6 +30,7 @@ export const NAV: NavGroup[] = [
       { href: "/manage/leads", label: "Leads", icon: Database, anyOf: ["leads.manage"] },
       { href: "/manage/imports", label: "Imports", icon: FileSpreadsheet, anyOf: ["leads.import"] },
       { href: "/manage/agents", label: "Agents", icon: UsersRound, anyOf: ["monitor.view"] },
+      { href: "/manage/emails", label: "Emails", icon: Mail, anyOf: ["leads.manage"] },
       { href: "/manage/reports", label: "Reports", icon: ChartColumn, anyOf: ["reports.view"] },
       { href: "/manage/performance", label: "Performance", icon: Award, anyOf: ["reports.approve"] },
     ],

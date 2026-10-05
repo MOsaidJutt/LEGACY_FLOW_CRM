@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Database, Mail } from "lucide-react";
 import { Badge, toneOf } from "@/components/ui/badge";
@@ -32,6 +32,8 @@ type Row = {
 
 export function LeadsTable({ rows, agents }: { rows: Row[]; agents: { id: string; name: string }[] }) {
   const router = useRouter();
+  // the open lead carries the current filters, so Back returns to the same list
+  const filters = useSearchParams().toString();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [agentId, setAgentId] = useState("");
   const [result, setResult] = useState<{ ok?: boolean; error?: string; message?: string } | null>(null);
@@ -123,7 +125,7 @@ export function LeadsTable({ rows, agents }: { rows: Row[]; agents: { id: string
                   <Checkbox checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.company ?? r.contactName ?? "lead"}`} />
                 </Td>
                 <Td className="max-w-[16rem] truncate">
-                  <Link href={`/manage/leads/${r.id}`} className="font-medium hover:underline">
+                  <Link href={`/manage/leads/${r.id}${filters ? `?from=${encodeURIComponent(filters)}` : ""}`} className="font-medium hover:underline">
                     {r.company || r.contactName || "Unnamed lead"}
                     {r.emailSent ? (
                       <Mail className="ml-1.5 inline size-3.5 align-[-2px] text-info" aria-label={`Follow-up email sent ${r.emailSent}`} />
