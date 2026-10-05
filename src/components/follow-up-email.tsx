@@ -38,6 +38,7 @@ export function FollowUpEmail({
   const [subject, setSubject] = useState(`Following up, ${leadName}`);
   const [body, setBody] = useState("");
   const [result, setResult] = useState<{ ok?: boolean; error?: string; message?: string } | null>(null);
+  const [sent, setSent] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const validTo = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to.trim());
@@ -47,8 +48,8 @@ export function FollowUpEmail({
       const r = await sendFollowUpEmailAction({ leadId, subject, body, to: to.trim() });
       setResult(r);
       if (r?.ok) {
-        setOpen(false);
-        setBody("");
+        // the confirmation stays on screen until it is closed, rather than vanishing with the dialog
+        setSent(true);
         router.refresh();
       }
     });
@@ -59,6 +60,7 @@ export function FollowUpEmail({
       size={compact ? "md" : undefined}
       onClick={() => {
         setResult(null);
+        setSent(false);
         setOpen(true);
       }}
       disabled={!configured}
@@ -82,7 +84,7 @@ export function FollowUpEmail({
               {assignedAgent ? ` · ${assignedAgent} is notified.` : ""}
             </p>
           )}
-          {result?.error && !open ? <FormMessage state={result} /> : null}
+          {result && !open ? <FormMessage state={result} /> : null}
         </>
       ) : null}
 
@@ -93,17 +95,35 @@ export function FollowUpEmail({
         description={leadName}
         className="w-[min(94vw,40rem)]"
         footer={
-          <>
-            <Button onClick={() => setOpen(false)} disabled={pending}>
-              Cancel
+          sent ? (
+            <Button
+              variant="primary"
+              onClick={() => {
+                setOpen(false);
+                setBody("");
+              }}
+            >
+              Done
             </Button>
-            <Button variant="primary" onClick={send} pending={pending} disabled={!validTo || subject.trim().length < 2 || body.trim().length < 2}>
-              <Mail aria-hidden /> Send email
-            </Button>
-          </>
+          ) : (
+            <>
+              <Button onClick={() => setOpen(false)} disabled={pending}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={send} pending={pending} disabled={!validTo || subject.trim().length < 2 || body.trim().length < 2}>
+                <Mail aria-hidden /> Send email
+              </Button>
+            </>
+          )
         }
       >
         <div className="flex flex-col gap-4">
+          {sent ? (
+            <div className="rounded-md border border-success/40 bg-success-soft px-3.5 py-3 text-sm">
+              <p className="font-medium text-ink">Email sent</p>
+              <p className="text-ink-2">{result?.message}</p>
+            </div>
+          ) : null}
           <Field label="To" htmlFor="email-to" hint={email ? "Correct it if needed; the lead is updated." : "This lead has no address yet. What you enter is saved to the lead."}>
             <Input id="email-to" type="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@company.com" maxLength={200} />
           </Field>
