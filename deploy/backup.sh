@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Nightly logical backup of the Legacy Flow database (30-day retention).
-# crontab on the VPS:   15 3 * * *  /opt/legacy-flow/deploy/backup.sh >> /var/log/legacy-flow/backup.log 2>&1
+# crontab on the VPS:   15 3 * * *  bash /opt/legacy-flow/deploy/backup.sh >> /var/log/legacy-flow/backup.log 2>&1
+#   (called through bash so the job survives a lost executable bit after a deploy)
 # Needs: postgresql-client. Set BACKUP_HOST in the environment to also copy each dump off the server.
 set -euo pipefail
 

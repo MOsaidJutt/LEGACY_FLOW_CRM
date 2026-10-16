@@ -46,6 +46,7 @@ case "${1:-status}" in
   update)
     cd "$APP_DIR"
     git pull --ff-only
+    chmod +x "$APP_DIR"/deploy/*.sh      # a lost executable bit silently stops the nightly backup
     npm install --no-audit --no-fund
     set -a; . "$APP_DIR/.env.production"; set +a
     npm run db:migrate
