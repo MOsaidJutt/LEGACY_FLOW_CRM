@@ -172,3 +172,39 @@ export async function importsWithLinkedRows(importIds: string[]) {
     .where(and(inArray(importRows.importId, importIds), isNotNull(importRows.leadId)));
   return new Set(rows.map((r) => r.importId));
 }
+
+/**
+ * Removes a lead source (campaign label) from the list. Either the leads go with it,
+ * or they stay and simply lose the label, so the dropdown can be tidied without
+ * losing data by accident.
+ */
+export async function deleteLeadSource(opts: { sourceId: string; deleteLeads: boolean; actorId: string }) {
+  const summary = await sourceDeletionSummary(opts.sourceId);
+  const result = await db.transaction(async (tx) => {
+    let leadsDeleted = 0;
+    let filesDeleted = 0;
+    if (opts.deleteLeads) {
+      leadsDeleted = (await tx.delete(leads).where(eq(leads.sourceId, opts.sourceId)).returning({ id: leads.id })).length;
+      filesDeleted = (await tx.delete(imports).where(eq(imports.sourceId, opts.sourceId)).returning({ id: imports.id })).length;
+    } else {
+      await tx.update(leads).set({ sourceId: null }).where(eq(leads.sourceId, opts.sourceId));
+      await tx.update(imports).set({ sourceId: null }).where(eq(imports.sourceId, opts.sourceId));
+    }
+    await tx.delete(leadSources).where(eq(leadSources.id, opts.sourceId));
+    return { leadsDeleted, filesDeleted };
+  });
+
+  await audit({
+    actorId: opts.actorId,
+    action: opts.deleteLeads ? "lead_source_and_leads_deleted" : "lead_source_deleted",
+    module: "imports",
+    entityType: "lead_source",
+    entityId: opts.sourceId,
+    summary: opts.deleteLeads
+      ? `Deleted the source "${summary.label}" with ${result.leadsDeleted} lead${result.leadsDeleted === 1 ? "" : "s"}`
+      : `Removed the source "${summary.label}" from the list; its ${summary.totalLeads} lead${summary.totalLeads === 1 ? "" : "s"} were kept`,
+    before: { campaign: summary.label, leads: summary.totalLeads, assignedLeads: summary.assignedLeads, calledLeads: summary.calledLeads },
+    after: { ...result, leadsKept: opts.deleteLeads ? 0 : summary.totalLeads },
+  });
+  return { ...result, label: summary.label, leadsKept: opts.deleteLeads ? 0 : summary.totalLeads };
+}

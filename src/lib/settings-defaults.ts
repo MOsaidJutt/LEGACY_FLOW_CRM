@@ -52,7 +52,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sessionMaxHours: 14,
   breakTypes: [
     { key: "short", label: "Short break", maxMinutes: 15 },
+    { key: "thirty", label: "30 minute break", maxMinutes: 30 },
     { key: "meal", label: "Meal break", maxMinutes: 45 },
+    { key: "sixty", label: "60 minute break", maxMinutes: 60 },
     { key: "prayer", label: "Prayer break", maxMinutes: 15 },
   ],
   hrDocumentCategories: ["Undertaking", "Agreement", "Warning letter", "Performance review", "ID document", "Other"],

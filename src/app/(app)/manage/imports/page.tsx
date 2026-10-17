@@ -11,6 +11,9 @@ import { ButtonLink } from "@/components/ui/button";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { DeleteImport } from "./delete-import";
+import { LeadSources } from "./lead-sources";
+import { leadDatabases } from "@/lib/leads/delete";
+import { Panel } from "@/components/ui/layout";
 
 export const metadata: Metadata = { title: "Imports" };
 
@@ -26,6 +29,7 @@ export default async function ImportsPage() {
   const tz = (await getSettings()).businessTimezone;
   const { imports, users, leadSources } = schema;
 
+  const sources = await leadDatabases();
   const rows = await db
     .select({
       id: imports.id,
@@ -104,6 +108,19 @@ export default async function ImportsPage() {
           </Table>
         )}
       </section>
+
+      <Panel
+        title="Lead sources"
+        description="The campaign names offered when importing. Remove one to take it out of the dropdown, keeping or deleting its leads."
+        className="mt-5"
+        flush
+      >
+        {sources.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-ink-3">No lead sources yet. The first import creates one.</p>
+        ) : (
+          <LeadSources sources={sources} />
+        )}
+      </Panel>
     </>
   );
 }

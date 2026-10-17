@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { authorize, failure, type ActionState } from "@/lib/actions";
-import { deleteImport, deleteSourceLeads, importDeletionSummary, sourceDeletionSummary, type DeletionSummary } from "@/lib/leads/delete";
+import { deleteImport, deleteLeadSource, deleteSourceLeads, importDeletionSummary, sourceDeletionSummary, type DeletionSummary } from "@/lib/leads/delete";
 
 export type SummaryState = { summary?: DeletionSummary; error?: string };
 
@@ -53,6 +53,24 @@ export async function deleteLeadDatabaseAction(input: { sourceId: string; remove
     return {
       ok: true,
       message: `Deleted ${result.leadsDeleted.toLocaleString()} lead${result.leadsDeleted === 1 ? "" : "s"} and ${result.filesDeleted} file${result.filesDeleted === 1 ? "" : "s"} from "${result.label}".`,
+    };
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+/** Removes a campaign label, with or without the leads behind it. */
+export async function deleteSourceAction(input: { sourceId: string; deleteLeads: boolean }): Promise<ActionState> {
+  try {
+    const actor = await authorize("leads.import");
+    const result = await deleteLeadSource({ sourceId: input.sourceId, deleteLeads: input.deleteLeads, actorId: actor.id });
+    revalidatePath("/manage/imports");
+    revalidatePath("/manage/leads");
+    return {
+      ok: true,
+      message: input.deleteLeads
+        ? `Deleted "${result.label}" and ${result.leadsDeleted.toLocaleString()} lead${result.leadsDeleted === 1 ? "" : "s"}.`
+        : `Removed "${result.label}" from the source list. ${result.leadsKept.toLocaleString()} lead${result.leadsKept === 1 ? "" : "s"} kept.`,
     };
   } catch (error) {
     return failure(error);
