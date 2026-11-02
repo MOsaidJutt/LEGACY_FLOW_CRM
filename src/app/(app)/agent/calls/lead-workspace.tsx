@@ -106,16 +106,22 @@ export function LeadWorkspace({
       setCall({ id: result.callId, startedAt: new Date(result.startedAt).getTime(), method: result.plan.method });
       const copiedOk = await copyNumber(result.digits);
       if (result.plan.method === "url") {
-        window.open(result.plan.url, "_blank", "noopener,noreferrer");
-        setCallMessage({ tone: "info", text: "Opened in your dialer. The number is also on your clipboard." });
+        // a named tab so every call reuses the same dialer window
+        const opened = window.open(result.plan.url, result.plan.windowName ?? "_blank", result.plan.windowName ? "" : "noopener,noreferrer");
+        try {
+          if (opened && result.plan.windowName) opened.opener = null;
+        } catch {
+          /* cross-origin, nothing to clear */
+        }
+        setCallMessage({ tone: "info", text: `${result.plan.provider ?? "Your dialer"} opened with the number filled in. It is on your clipboard too.` });
       } else if (result.plan.method === "dialer") {
         setCallMessage({ tone: "info", text: "VC Dialer is placing the call." });
       } else {
         setCallMessage({
           tone: "info",
           text: copiedOk
-            ? `Number copied. Paste it into VC Dialer.${result.plan.reason ? ` (${result.plan.reason}.)` : ""}`
-            : "Copy the selected number with Ctrl+C and paste it into VC Dialer.",
+            ? `Number copied. Paste it into your dialer.${result.plan.reason ? ` (${result.plan.reason}.)` : ""}`
+            : "Copy the selected number with Ctrl+C and paste it into your dialer.",
         });
       }
     });

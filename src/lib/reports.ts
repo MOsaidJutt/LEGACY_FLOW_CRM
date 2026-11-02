@@ -6,6 +6,7 @@ import { attendance, summarizeAttendance } from "./attendance";
 import type { Period } from "./period";
 import { formatTime } from "./time";
 import type { Kind } from "./report-format";
+import { getSettings } from "@/lib/settings";
 
 export type ReportType = "performance" | "punctuality" | "sources";
 
@@ -40,6 +41,8 @@ export function periodKind(period: Period) {
 }
 
 export async function buildReport(type: ReportType, period: Period, tz: string, opts: { agentId?: string | null } = {}): Promise<ReportData> {
+  // reports name the office location rather than the raw time zone id
+  const place = (await getSettings()).businessLocation?.trim() || tz;
   const range = period.fromDay === period.toDay ? period.fromDay : `${period.fromDay} to ${period.toDay}`;
   const base = { type, fromDay: period.fromDay, toDay: period.toDay, generatedAt: new Date().toISOString() };
   let agents = await agentUsers();
@@ -92,7 +95,7 @@ export async function buildReport(type: ReportType, period: Period, tz: string, 
     return {
       ...base,
       title: `${periodKind(period)} performance report`,
-      subtitle: `${range}${scope} · times in ${tz}`,
+      subtitle: `${range}${scope} · times in ${place}`,
       columns: [
         { key: "agent", label: "Agent", kind: "text" },
         { key: "calls", label: "Calls", kind: "number" },
@@ -164,7 +167,7 @@ export async function buildReport(type: ReportType, period: Period, tz: string, 
     return {
       ...base,
       title: "Punctuality report",
-      subtitle: `${range}${scope} · times in ${tz}`,
+      subtitle: `${range}${scope} · times in ${place}`,
       columns: [
         { key: "day", label: "Day", kind: "text" },
         { key: "agent", label: "Agent", kind: "text" },

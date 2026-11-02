@@ -1,4 +1,4 @@
-export type DialerMode = "clipboard" | "url" | "vcdialer";
+export type DialerMode = "clipboard" | "url" | "vcdialer" | "arix";
 
 export type DialerSettings = {
   mode: DialerMode;
@@ -6,6 +6,8 @@ export type DialerSettings = {
   urlTemplate: string;
   /** VC Dialer API credentials, filled in once the client shares API access. */
   vcdialer: { apiBaseUrl: string; apiKey: string; accountId: string };
+  /** Arix Call: the dial page opens with the number filled in, reusing one tab. */
+  arix: { dialUrl: string; windowName: string };
   /** agent user id -> dialer extension / agent id */
   extensions: Record<string, string>;
 };
@@ -27,6 +29,8 @@ export type EmailSettings = {
 export type AppSettings = {
   companyName: string;
   businessTimezone: string;
+  /** Shown on reports instead of the raw time zone name, e.g. "Dallas, Texas". */
+  businessLocation: string;
   inactivityMinutes: number;
   autoAssignMinutes: number;
   leadPresets: number[];
@@ -44,6 +48,7 @@ export type AppSettings = {
 export const DEFAULT_SETTINGS: AppSettings = {
   companyName: "Lone Star Legacy",
   businessTimezone: "America/Chicago",
+  businessLocation: "Dallas, Texas",
   inactivityMinutes: 5,
   autoAssignMinutes: 5,
   leadPresets: [15, 30],
@@ -62,6 +67,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     mode: "clipboard",
     urlTemplate: "",
     vcdialer: { apiBaseUrl: "", apiKey: "", accountId: "" },
+    arix: { dialUrl: "https://app.arixcall.com/phone?dial=", windowName: "arixcall" },
     extensions: {},
   },
   email: { host: "", port: 587, secure: false, user: "", password: "", fromName: "Lone Star Legacy", fromEmail: "", replyTo: "" },

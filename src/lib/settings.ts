@@ -19,6 +19,7 @@ async function load(): Promise<AppSettings> {
     ...DEFAULT_SETTINGS.dialer,
     ...s.dialer,
     vcdialer: { ...DEFAULT_SETTINGS.dialer.vcdialer, ...s.dialer?.vcdialer },
+    arix: { ...DEFAULT_SETTINGS.dialer.arix, ...s.dialer?.arix },
     extensions: { ...s.dialer?.extensions },
   };
   s.email = { ...DEFAULT_SETTINGS.email, ...s.email };

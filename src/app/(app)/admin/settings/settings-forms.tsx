@@ -11,6 +11,7 @@ import { saveBreaksAction, saveRulesAction, saveShiftAction } from "../config-ac
 
 type Rules = {
   businessTimezone: string;
+  businessLocation: string;
   inactivityMinutes: number;
   autoAssignMinutes: number;
   leadPresets: string;
@@ -23,7 +24,10 @@ export function RulesForm({ values: v, timezones }: { values: Rules; timezones: 
   const [state, action] = useActionState(saveRulesAction, null);
   return (
     <form action={action} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Field label="Business time zone" htmlFor="tz" hint="Days, reports and callback times use this zone.">
+      <Field label="Office location" htmlFor="businessLocation" hint="Printed on reports, e.g. Dallas, Texas. Leave empty to print the time zone name.">
+        <Input id="businessLocation" name="businessLocation" defaultValue={v.businessLocation} placeholder="Dallas, Texas" maxLength={80} />
+      </Field>
+      <Field label="Business time zone" htmlFor="tz" hint="Days, reports and callback times use this zone. Dallas and the rest of Texas are America/Chicago.">
         <Select id="tz" name="businessTimezone" defaultValue={v.businessTimezone}>
           {timezones.map((t) => (
             <option key={t} value={t}>

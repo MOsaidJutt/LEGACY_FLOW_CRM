@@ -1,24 +1,30 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { cn } from "@/lib/cn";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/layout";
 import { FormMessage } from "@/components/ui/form-message";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { saveDialerAction } from "../config-actions";
+import { saveDialerAction, setArixConnectedAction } from "../config-actions";
 
-type Settings = { mode: "clipboard" | "url" | "vcdialer"; urlTemplate: string; apiBaseUrl: string; accountId: string; hasApiKey: boolean; extensions: Record<string, string> };
+type Settings = { mode: "clipboard" | "url" | "vcdialer" | "arix"; urlTemplate: string; apiBaseUrl: string; accountId: string; hasApiKey: boolean; extensions: Record<string, string>; arixDialUrl: string };
 
 const MODES = [
   { value: "clipboard", title: "Copy the number", body: "Clicking Call copies the number; the agent pastes it into VC Dialer. Works with any dialer, no setup." },
   { value: "url", title: "Click-to-call link", body: "Opens a dialer URL with the number filled in (for dialers or softphones that accept a link). The number is also copied." },
+  { value: "arix", title: "Arix Call", body: "Clicking Call opens the Arix dial page with the number already filled in, always in the same tab. The number is copied as well." },
   { value: "vcdialer", title: "VC Dialer API", body: "The CRM asks VC Dialer to place the call for the agent's extension and receives call results. Needs API access from VC Dialer." },
 ] as const;
 
 export function DialerForm({ settings, agents, webhookUrl }: { settings: Settings; agents: { id: string; name: string }[]; webhookUrl: string }) {
   const [mode, setMode] = useState(settings.mode);
   const [state, action] = useActionState(saveDialerAction, null);
+  const [switchResult, setSwitchResult] = useState<{ ok?: boolean; error?: string; message?: string } | null>(null);
+  const [switching, startSwitch] = useTransition();
+  const connected = mode === "arix";
 
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -40,6 +46,38 @@ export function DialerForm({ settings, agents, webhookUrl }: { settings: Setting
             </label>
           ))}
         </div>
+      </Panel>
+
+      <Panel
+        title="Arix Call"
+        description="Connect Arix Call to place calls from the CRM. Disconnect at any time and the Call button falls back to copying the number."
+        actions={
+          <span className="flex items-center gap-2">
+            {connected ? <Badge tone="success">Connected</Badge> : <Badge>Not connected</Badge>}
+            <Button
+              type="button"
+              variant={connected ? "danger" : "primary"}
+              pending={switching}
+              onClick={() =>
+                startSwitch(async () => {
+                  const r = await setArixConnectedAction(!connected);
+                  setSwitchResult(r);
+                  if (r?.ok) setMode(!connected ? "arix" : "clipboard");
+                })
+              }
+            >
+              {connected ? "Disconnect" : "Connect Arix Call"}
+            </Button>
+          </span>
+        }
+      >
+        <Field label="Arix dial page" htmlFor="arixDialUrl" hint="The number's digits are added to the end of this address. Change it only if Arix gives you a different dial link.">
+          <Input id="arixDialUrl" name="arixDialUrl" defaultValue={settings.arixDialUrl} placeholder="https://app.arixcall.com/phone?dial=" className="font-mono text-[13px]" />
+        </Field>
+        <p className="mt-3 text-[13px] text-ink-3">
+          Agents sign in to Arix once in that tab. Every call after that reuses the same window, so the dialer stays signed in.
+        </p>
+        <FormMessage state={switchResult} />
       </Panel>
 
       <Panel title="Click-to-call link" description="Placeholders: {phone} (10 digits), {e164} (+1...), {extension} (agent's extension), {lead} (lead id).">

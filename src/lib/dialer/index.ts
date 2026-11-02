@@ -7,12 +7,12 @@ import { vcDialer } from "./vcdialer";
  * carries it out; the clipboard copy happens in every mode as a safety net.
  *
  *   clipboard - copy the number (the SRS fallback, always available)
- *   url       - open a click-to-call URL built from settings.urlTemplate
+ *   url       - open a click-to-call URL (Arix Call, or settings.urlTemplate)
  *   dialer    - the server asked the dialer API to place the call
  */
 export type DialPlan =
   | { method: "clipboard"; reason?: string }
-  | { method: "url"; url: string }
+  | { method: "url"; url: string; windowName?: string; provider?: string }
   | { method: "dialer"; externalId: string | null };
 
 export type DialContext = {
@@ -41,6 +41,14 @@ export async function planDial(settings: DialerSettings, ctx: DialContext): Prom
       console.error("[dialer] VC Dialer call failed, falling back to clipboard", error);
       return { method: "clipboard", reason: "VC Dialer did not accept the call" };
     }
+  }
+
+  if (settings.mode === "arix") {
+    const base = settings.arix.dialUrl.trim();
+    if (!/^https?:\/\//i.test(base)) return { method: "clipboard", reason: "Arix Call is not connected yet" };
+    // Arix fills its number box from the digits on the end of the dial URL
+    const digits = ctx.phoneE164.replace(/^\+1/, "").replace(/\D/g, "");
+    return { method: "url", url: base + encodeURIComponent(digits), windowName: settings.arix.windowName || "arixcall", provider: "Arix Call" };
   }
 
   if (settings.mode === "url" && settings.urlTemplate.trim()) {

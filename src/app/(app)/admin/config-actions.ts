@@ -105,6 +105,7 @@ export async function saveRulesAction(_prev: ActionState, formData: FormData): P
     const actor = await authorize("settings.manage");
     const before = await readSettings();
     const tz = formString(formData, "businessTimezone");
+    const location = formString(formData, "businessLocation").slice(0, 80);
     const inactivity = int(formString(formData, "inactivityMinutes"), 1, 60);
     const autoAssign = int(formString(formData, "autoAssignMinutes"), 1, 60);
     const maxReq = int(formString(formData, "maxLeadRequest"), 1, 2000);
@@ -120,6 +121,7 @@ export async function saveRulesAction(_prev: ActionState, formData: FormData): P
 
     const next = {
       businessTimezone: tz,
+      businessLocation: location,
       inactivityMinutes: inactivity,
       autoAssignMinutes: autoAssign,
       maxLeadRequest: maxReq,
@@ -202,7 +204,7 @@ export async function saveDialerAction(_prev: ActionState, formData: FormData): 
     const actor = await authorize("settings.manage");
     const current = (await readSettings()).dialer;
     const mode = formString(formData, "mode") as DialerSettings["mode"];
-    if (!["clipboard", "url", "vcdialer"].includes(mode)) return { error: "Choose how calls are placed." };
+    if (!["clipboard", "url", "vcdialer", "arix"].includes(mode)) return { error: "Choose how calls are placed." };
     const urlTemplate = formString(formData, "urlTemplate").slice(0, 500);
     if (mode === "url" && !/^(https?|tel|sip|callto):/i.test(urlTemplate)) return { error: "The click-to-call URL must start with https://, tel:, sip: or callto:." };
     if (mode === "url" && !urlTemplate.includes("{phone}") && !urlTemplate.includes("{e164}")) return { error: "Include {phone} or {e164} in the click-to-call URL." };
@@ -213,9 +215,12 @@ export async function saveDialerAction(_prev: ActionState, formData: FormData): 
     for (const [k, v] of formData.entries()) {
       if (k.startsWith("ext:") && typeof v === "string" && v.trim()) extensions[k.slice(4)] = v.trim().slice(0, 40);
     }
+    const arixDialUrl = formString(formData, "arixDialUrl").slice(0, 300) || current.arix.dialUrl;
+    if (mode === "arix" && !/^https:\/\//i.test(arixDialUrl)) return { error: "The Arix Call dial page must start with https://." };
     const next: DialerSettings = {
       mode,
       urlTemplate,
+      arix: { dialUrl: arixDialUrl, windowName: current.arix.windowName || "arixcall" },
       vcdialer: { apiBaseUrl, apiKey: newKey || current.vcdialer.apiKey, accountId: formString(formData, "accountId").slice(0, 120) },
       extensions,
     };
@@ -286,6 +291,35 @@ export async function testEmailAction(): Promise<ActionState> {
     const { verifyMailSettings } = await import("@/lib/email");
     const result = await verifyMailSettings();
     return result.ok ? { ok: true, message: "The mail server accepted the connection and sign-in." } : { error: result.error };
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+/** One-click connect and disconnect for Arix Call, for Admin and Management. */
+export async function setArixConnectedAction(connected: boolean): Promise<ActionState> {
+  try {
+    const actor = await authorize("settings.manage");
+    const current = (await readSettings()).dialer;
+    const next: DialerSettings = { ...current, mode: connected ? "arix" : "clipboard" };
+    await saveSetting("dialer", next, actor.id);
+    await audit({
+      actorId: actor.id,
+      action: connected ? "dialer_arix_connected" : "dialer_arix_disconnected",
+      module: "settings",
+      entityType: "settings",
+      entityId: "dialer",
+      before: { mode: current.mode },
+      after: { mode: next.mode },
+    });
+    revalidatePath("/admin/dialer");
+    revalidatePath("/agent/calls");
+    return {
+      ok: true,
+      message: connected
+        ? "Arix Call connected. The Call button now opens the Arix dial page with the number filled in."
+        : "Arix Call disconnected. The Call button copies the number instead.",
+    };
   } catch (error) {
     return failure(error);
   }

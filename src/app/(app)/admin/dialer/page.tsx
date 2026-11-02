@@ -16,10 +16,10 @@ export default async function DialerPage() {
     <>
       <PageHeader
         title="Dialer"
-        description="How the agent's Call button works. Copying the number to the clipboard always works; connect VC Dialer here once its API access is available."
+        description="How the agent's Call button works. Copying the number to the clipboard always works, and Arix Call can be connected or disconnected here at any time."
       />
       <DialerForm
-        settings={{ mode: d.mode, urlTemplate: d.urlTemplate, apiBaseUrl: d.vcdialer.apiBaseUrl, accountId: d.vcdialer.accountId, hasApiKey: Boolean(d.vcdialer.apiKey), extensions: d.extensions }}
+        settings={{ mode: d.mode, urlTemplate: d.urlTemplate, apiBaseUrl: d.vcdialer.apiBaseUrl, accountId: d.vcdialer.accountId, hasApiKey: Boolean(d.vcdialer.apiKey), extensions: d.extensions, arixDialUrl: d.arix.dialUrl }}
         agents={agents.map((a) => ({ id: a.id, name: a.name }))}
         webhookUrl={`${appUrl || "https://<your-domain>"}/api/dialer/webhook`}
       />

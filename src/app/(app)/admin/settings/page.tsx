@@ -22,6 +22,7 @@ export default async function SettingsPage() {
             timezones={TIMEZONES}
             values={{
               businessTimezone: settings.businessTimezone,
+              businessLocation: settings.businessLocation,
               inactivityMinutes: settings.inactivityMinutes,
               autoAssignMinutes: settings.autoAssignMinutes,
               leadPresets: settings.leadPresets.join(", "),
