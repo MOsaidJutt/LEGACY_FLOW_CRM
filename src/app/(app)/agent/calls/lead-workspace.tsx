@@ -44,6 +44,33 @@ function wallInput(date: Date, tz: string) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}`;
 }
 
+/**
+ * The dialer tab. Held at module scope so it outlives moving between leads, and
+ * reused by window name as well, so an agent signs in to the dialer once a shift.
+ *
+ * The opener link is left in place on purpose. Clearing it (opened.opener = null)
+ * succeeds while the new tab is still about:blank, and Chrome then stops matching
+ * that tab by name, so every call would open another tab.
+ */
+let dialWindow: Window | null = null;
+
+function openDialer(url: string, windowName?: string) {
+  if (!windowName) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (dialWindow && !dialWindow.closed) {
+    try {
+      dialWindow.location.href = url;
+      dialWindow.focus();
+      return;
+    } catch {
+      /* unreachable tab: fall through and open a fresh one */
+    }
+  }
+  dialWindow = window.open(url, windowName, "");
+}
+
 export function LeadWorkspace({
   lead,
   dispositions,
@@ -106,13 +133,7 @@ export function LeadWorkspace({
       setCall({ id: result.callId, startedAt: new Date(result.startedAt).getTime(), method: result.plan.method });
       const copiedOk = await copyNumber(result.digits);
       if (result.plan.method === "url") {
-        // a named tab so every call reuses the same dialer window
-        const opened = window.open(result.plan.url, result.plan.windowName ?? "_blank", result.plan.windowName ? "" : "noopener,noreferrer");
-        try {
-          if (opened && result.plan.windowName) opened.opener = null;
-        } catch {
-          /* cross-origin, nothing to clear */
-        }
+        openDialer(result.plan.url, result.plan.windowName);
         setCallMessage({ tone: "info", text: `${result.plan.provider ?? "Your dialer"} opened with the number filled in. It is on your clipboard too.` });
       } else if (result.plan.method === "dialer") {
         setCallMessage({ tone: "info", text: "VC Dialer is placing the call." });
